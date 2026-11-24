@@ -1,0 +1,5 @@
+# Real credentials: keep out of git
+secrets.yaml
+
+# ESPHome build output
+.esphome/

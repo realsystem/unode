@@ -1,0 +1,154 @@
+# UNODE iteration-1 POC: generator node
+# Hardware: ESP-12E devkit (ESP8266, "NodeMCU") + SW-420 vibration module
+# Power for the POC: USB (power bank or USB charger). No deep sleep.
+# Reports to Home Assistant over MQTT (Mosquitto), with HA auto-discovery.
+#
+# Wiring:
+#   SW-420 VCC -> 3V3
+#   SW-420 GND -> GND
+#   SW-420 DO  -> D7 (GPIO13)
+# Optional (only if you add 2 resistors later): generator USB 5 V -> 10k -> D5 (GPIO14), 20k D5 -> GND
+
+substitutions:
+  name: unode-gen-poc
+  friendly_name: UNODE Generator POC
+  # Pulses per minute above which the engine counts as running.
+  # Start at 5, then set it halfway between "engine off" and "engine idle" after the field test.
+  run_threshold: "5"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp8266:
+  board: nodemcuv2
+  # Persisted values (run time) are written to flash at most every 10 min to limit flash wear.
+  restore_from_flash: true
+
+preferences:
+  flash_write_interval: 10min
+
+logger:
+  level: INFO
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  # POC is on USB power: keep Wi-Fi fully awake for the fastest alerts.
+  # For the battery tests later, change to LIGHT and measure the current.
+  power_save_mode: none
+  ap:
+    ssid: "UNODE-POC-Fallback"
+    password: !secret fallback_password
+
+captive_portal:
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: true
+  # The broker publishes "offline" for this node about 1.5 x keepalive after it disappears.
+  keepalive: 15s
+
+globals:
+  # Total engine run time in minutes; survives reboots and power loss (saved every 10 min).
+  - id: run_minutes
+    type: float
+    restore_value: true
+    initial_value: "0"
+
+sensor:
+  # Counts SW-420 output pulses; reported as pulses per minute every 10 s.
+  - platform: pulse_counter
+    pin:
+      number: GPIO13
+      mode: INPUT
+    id: vib_rate
+    name: "Vibration pulses per minute"
+    unit_of_measurement: "pulses/min"
+    update_interval: 10s
+    count_mode:
+      rising_edge: INCREMENT
+      falling_edge: DISABLE
+
+  - platform: template
+    name: "Generator run hours"
+    unit_of_measurement: "h"
+    accuracy_decimals: 2
+    state_class: total_increasing
+    update_interval: 60s
+    lambda: |-
+      return id(run_minutes) / 60.0;
+
+  # Wi-Fi signal at the node: the shed reach test.
+  - platform: wifi_signal
+    name: "WiFi signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
+binary_sensor:
+  # Raw SW-420 output, for calibrating the potentiometer. Flip "inverted" if it reads ON when still.
+  - platform: gpio
+    pin:
+      number: GPIO13
+      mode: INPUT
+      inverted: false
+    name: "Vibration raw"
+    filters:
+      - delayed_off: 200ms
+
+  # Engine running = enough vibration pulses, held for a while to ignore bumps and wind.
+  - platform: template
+    id: gen_running
+    name: "Generator running"
+    device_class: running
+    lambda: |-
+      return id(vib_rate).state > ${run_threshold};
+    filters:
+      - delayed_on: 20s
+      - delayed_off: 60s
+
+  # Node connected to MQTT (HA marks it unavailable when the node drops off).
+  - platform: status
+    name: "Node status"
+
+  # --- Optional: uncomment after adding the 10k/20k divider on D5 ---
+  # - platform: gpio
+  #   pin:
+  #     number: GPIO14
+  #     mode: INPUT
+  #   id: ac_present
+  #   name: "Generator 5 V present"
+  #   filters:
+  #     - delayed_on: 2s
+  #     - delayed_off: 2s
+  #
+  # - platform: template
+  #   name: "Generator AC lost while running"
+  #   device_class: problem
+  #   lambda: |-
+  #     return id(gen_running).state && !id(ac_present).state;
+
+interval:
+  # Add one minute of run time for every minute the engine is running.
+  - interval: 60s
+    then:
+      - if:
+          condition:
+            binary_sensor.is_on: gen_running
+          then:
+            - lambda: |-
+                id(run_minutes) += 1.0;
+
+button:
+  - platform: restart
+    name: "Restart"
