@@ -69,6 +69,7 @@ sensor:
     pin:
       number: GPIO13
       mode: INPUT
+      allow_other_uses: true
     id: vib_rate
     name: "Vibration pulses per minute"
     unit_of_measurement: "pulses/min"
@@ -102,6 +103,7 @@ binary_sensor:
       number: GPIO13
       mode: INPUT
       inverted: false
+      allow_other_uses: true
     name: "Vibration raw"
     filters:
       - delayed_off: 200ms
