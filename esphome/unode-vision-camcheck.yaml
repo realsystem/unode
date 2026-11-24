@@ -1,0 +1,83 @@
+# UNODE vision add-on: bench camera check (iteration 2, step 1)
+# Hardware: AI-Thinker ESP32-CAM (OV2640), powered from a solid 5 V USB supply.
+# Purpose: prove the camera works, check image quality and framing, measure current.
+# This is a bench tool, not node firmware: it serves JPEG snapshots/stream over HTTP
+# so you can look at the panel from a browser. No Home Assistant needed.
+#
+#   Stream:   http://<camera IP>:8080/
+#   Snapshot: http://<camera IP>:8081/
+#
+# Status: UNVERIFIED. Pin map is the AI-Thinker map from the ESPHome docs; check with
+# `esphome config` on the dev box. If the camera fails to start ("Camera probe failed"),
+# the board is often a clone with a different map or a loose camera ribbon.
+
+substitutions:
+  name: unode-vision-camcheck
+  friendly_name: UNODE Vision Camera Check
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32cam
+
+psram:
+
+logger:
+  level: INFO
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "UNODE-CAM-Fallback"
+    password: !secret fallback_password
+
+captive_portal:
+
+i2c:
+  - id: camera_i2c
+    sda: GPIO26
+    scl: GPIO27
+
+esp32_camera:
+  name: "Panel camera"
+  external_clock:
+    pin: GPIO0
+    frequency: 20MHz
+  i2c_id: camera_i2c
+  data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
+  vsync_pin: GPIO25
+  href_pin: GPIO23
+  pixel_clock_pin: GPIO22
+  power_down_pin: GPIO32
+  resolution: 800x600
+  jpeg_quality: 10
+
+esp32_camera_web_server:
+  - port: 8080
+    mode: stream
+  - port: 8081
+    mode: snapshot
+
+output:
+  - platform: gpio
+    pin: GPIO4
+    id: flash_led_out
+
+light:
+  # On-board flash LED. Keep OFF when reading panel LEDs (it washes them out);
+  # useful only to see the panel labels in the dark during setup.
+  - platform: binary
+    output: flash_led_out
+    name: "Flash LED"
+
+sensor:
+  - platform: wifi_signal
+    name: "WiFi signal"
+    update_interval: 60s
