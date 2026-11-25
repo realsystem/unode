@@ -1,0 +1,9 @@
+﻿  - platform: template
+    id: gen_running
+    name: "Generator running"
+    device_class: running
+    lambda: |-
+      return id(vib_rate).state > ${run_threshold};
+    filters:
+      - delayed_off: 60s
+      - delayed_on: 20s
