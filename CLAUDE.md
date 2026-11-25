@@ -21,7 +21,9 @@
 
 ## Conventions
 - Monitoring only by default; control is optional and only via a relay module. Never modify the monitored equipment: generator uses external ports only; starter-battery SAE port is sense-only, never a power source.
-- Each node has its own battery + small solar panel; USB is a backup charge path only where a USB source exists.
+- Power variants (shared terms with SNODE): pump node = solar only (panel + supercapacitor, daylight only); generator node = open (must monitor the starter battery while the generator is off). Iteration 1 POC runs on USB / power bank.
+- Node IDs follow `unode_<purpose>_<nn>` (e.g. `unode_gen_01`, `unode_pump_01`).
+- Stay compatible with SNODE (https://github.com/realsystem/snode): reserved ESP-NOW packet types 0x10-0x1F / 0x90-0x9F and HA event `esphome.unode_report`. Contract: docs/snode-compat.md (reference copy in the SNODE repo); change both together.
 - Use MQTT, not the ESPHome native API (nodes may sleep; broker LWT gives the offline alert).
 - Keep HA-facing entity names stable (automations depend on them): "Generator running", "Generator run hours", "Node status".
 - Persisted counters: `globals` with `restore_value` + `preferences: flash_write_interval: 10min` (flash wear).
