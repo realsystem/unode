@@ -15,6 +15,10 @@ substitutions:
   # Pulses per minute above which the engine counts as running.
   # Start at 5, then set it halfway between "engine off" and "engine idle" after the field test.
   run_threshold: "5"
+  # "Generator running" turns on after vibration has been continuous for this long...
+  run_on_delay_s: "20"
+  # ...and turns off only after this long with no vibration (a shorter dropout is ignored).
+  run_off_delay_s: "60"
 
 esphome:
   name: ${name}
@@ -63,6 +67,20 @@ globals:
     restore_value: true
     initial_value: "0"
 
+  # State of the "Generator running" hysteresis (see the binary_sensor below). Not persisted.
+  - id: act_on          # vibration above run_threshold in the latest reading, continuously
+    type: bool
+    initial_value: "false"
+  - id: act_since       # millis() when the current continuous vibration began
+    type: uint32_t
+    initial_value: "0"
+  - id: last_active     # millis() of the latest reading above run_threshold
+    type: uint32_t
+    initial_value: "0"
+  - id: gen_running_state
+    type: bool
+    initial_value: "false"
+
 sensor:
   # Counts SW-420 output pulses; reported as pulses per minute every 10 s.
   - platform: pulse_counter
@@ -108,16 +126,35 @@ binary_sensor:
     filters:
       - delayed_off: 200ms
 
-  # Engine running = enough vibration pulses, held for a while to ignore bumps and wind.
+  # Engine running = vibration above run_threshold, with hysteresis to ignore bumps and wind:
+  #   OFF -> ON  after run_on_delay_s of continuous vibration
+  #   ON  -> OFF after run_off_delay_s without any (shorter dropouts are ignored)
+  # Done in the lambda, not with delayed_on/delayed_off filters: chained in either order they
+  # glitch (original order blips OFF->ON after a dropout; swapped order latches ON after a bump).
   - platform: template
     id: gen_running
     name: "Generator running"
     device_class: running
     lambda: |-
-      return id(vib_rate).state > ${run_threshold};
-    filters:
-      - delayed_on: 20s
-      - delayed_off: 60s
+      const uint32_t now = millis();
+      const bool active = id(vib_rate).state > ${run_threshold};  // NaN compares false
+      if (active) {
+        if (!id(act_on)) {
+          id(act_on) = true;
+          id(act_since) = now;
+        }
+        id(last_active) = now;
+      } else {
+        id(act_on) = false;
+      }
+      if (!id(gen_running_state)) {
+        if (id(act_on) && (now - id(act_since)) >= ${run_on_delay_s} * 1000UL) {
+          id(gen_running_state) = true;
+        }
+      } else if (!id(act_on) && (now - id(last_active)) >= ${run_off_delay_s} * 1000UL) {
+        id(gen_running_state) = false;
+      }
+      return id(gen_running_state);
 
   # Node connected to MQTT (HA marks it unavailable when the node drops off).
   - platform: status
