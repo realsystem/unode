@@ -21,7 +21,7 @@
 
 ## Conventions
 - Monitoring only by default; control is optional and only via a relay module. Never modify the monitored equipment: generator uses external ports only; starter-battery SAE port is sense-only, never a power source.
-- Power variants (shared terms with SNODE): pump node = solar only (panel + supercapacitor, daylight only); generator node = open (must monitor the starter battery while the generator is off). Iteration 1 POC runs on USB / power bank.
+- Power variants (shared terms with SNODE): pump node = solar only (panel + supercapacitor, daylight only); generator node = battery only (primary lithium AA, no charging; wakes on USB/AC 5 V change and on a timer that also reads the starter battery). Reuse SNODE designs where they fit: docs/snode-compat.md "Reused from SNODE". Iteration 1 POC runs on USB / power bank.
 - Node IDs follow `unode_<purpose>_<nn>` (e.g. `unode_gen_01`, `unode_pump_01`).
 - Stay compatible with SNODE (https://github.com/realsystem/snode): reserved ESP-NOW packet types 0x10-0x1F / 0x90-0x9F and HA event `esphome.unode_report`. Contract: docs/snode-compat.md (reference copy in the SNODE repo); change both together.
 - Use MQTT, not the ESPHome native API (nodes may sleep; broker LWT gives the offline alert).
@@ -38,7 +38,7 @@
 - GPIO0/2/15 are boot-strapping pins; don't put loads on them that change their boot level.
 - SW-420 output polarity varies by module: check `inverted` on the bench.
 - Windows flashing needs the Silicon Labs CP210x (or CH340) USB driver.
-- Li-ion must not charge below 0 °C: charger needs an NTC on its TS/TH pin; don't remove it.
+- No rechargeable cells in the node designs (gen = primary lithium, pump = supercapacitor). If a Li-ion/LiFePO4 cell is ever added, it must not charge below 0 °C (charger with cold cut-off).
 - Site internet (Starlink) sleeps 9 PM–9 AM; nothing in the design may depend on internet.
 - In Claude cloud sessions pip/package installs are blocked, so `esphome`/`arduino-cli` can't be run there; GitHub GraphQL (`gh pr create`) is blocked, use `gh api repos/realsystem/unode/pulls ...`.
 
