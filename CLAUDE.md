@@ -16,8 +16,9 @@
 - `esphome/` — one ESPHome YAML per node (`unode-gen-poc.yaml` = generator node) + `secrets.yaml.example`.
 - `examples/` — standalone Arduino bench sketches; not node firmware.
 - Data flow: node → trailer Wi-Fi (2.4 GHz) → MQTT (Mosquitto add-on on the HA Pi) → HA entities via MQTT discovery. HA does all logging and alerting.
-- Planned pump node (~300 ft away) must not rely on Wi-Fi: LoRa via a separate Meshtastic module fed over UART (TEXTMSG). Pi-side LoRa receiver is out of scope but assumed present.
-- ESP8266 pin map (keep consistent across nodes): SW-420 DO = D7/GPIO13; optional 5 V sense = D5/GPIO14 via 10k/20k divider; GPIO16→RST reserved for timed deep sleep; GPIO15 = optional relay (must be low at boot); GPIO2 = UART1 TX to LoRa.
+- Iteration 2 radio (owner): ESP-NOW to the shared SNODE receiver at the trailer (channel follow), which forwards to HA as `esphome.unode_report`. LoRa/Meshtastic is deferred until the first SNODE/UNODE versions are field-tested.
+- Generator node wake (owner: G1): ESP32-C3 deep sleep with GPIO level wake on the 5 V sense (firmware arms the opposite level before sleeping) + timer heartbeat that also reads the starter battery.
+- ESP8266 pin map (keep consistent across nodes): SW-420 DO = D7/GPIO13; optional 5 V sense = D5/GPIO14 via 10k/20k divider; GPIO16→RST reserved for timed deep sleep; GPIO15 = optional relay (must be low at boot); GPIO2 = spare (was UART1 TX to LoRa, deferred).
 
 ## Conventions
 - Monitoring only by default; control is optional and only via a relay module. Never modify the monitored equipment: generator uses external ports only; starter-battery SAE port is sense-only, never a power source.
