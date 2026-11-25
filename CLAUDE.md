@@ -16,12 +16,13 @@
 - `esphome/` — one ESPHome YAML per node (`unode-gen-poc.yaml` = generator node) + `secrets.yaml.example`.
 - `examples/` — standalone Arduino bench sketches; not node firmware.
 - Data flow: node → trailer Wi-Fi (2.4 GHz) → MQTT (Mosquitto add-on on the HA Pi) → HA entities via MQTT discovery. HA does all logging and alerting.
-- Planned pump node (~300 ft away) must not rely on Wi-Fi: LoRa via a separate Meshtastic module fed over UART (TEXTMSG). Pi-side LoRa receiver is out of scope but assumed present.
-- ESP8266 pin map (keep consistent across nodes): SW-420 DO = D7/GPIO13; optional 5 V sense = D5/GPIO14 via 10k/20k divider; GPIO16→RST reserved for timed deep sleep; GPIO15 = optional relay (must be low at boot); GPIO2 = UART1 TX to LoRa.
+- Iteration 2 radio (owner): ESP-NOW to the shared SNODE receiver at the trailer (channel follow), which forwards to HA as `esphome.unode_report`. LoRa/Meshtastic is deferred until the first SNODE/UNODE versions are field-tested.
+- Generator node wake (owner: G1): ESP32-C3 deep sleep with GPIO level wake on the 5 V sense (firmware arms the opposite level before sleeping) + timer heartbeat that also reads the starter battery.
+- ESP8266 pin map (keep consistent across nodes): SW-420 DO = D7/GPIO13; optional 5 V sense = D5/GPIO14 via 10k/20k divider; GPIO16→RST reserved for timed deep sleep; GPIO15 = optional relay (must be low at boot); GPIO2 = spare (was UART1 TX to LoRa, deferred).
 
 ## Conventions
 - Monitoring only by default; control is optional and only via a relay module. Never modify the monitored equipment: generator uses external ports only; starter-battery SAE port is sense-only, never a power source.
-- Power variants (shared terms with SNODE): pump node = solar only (panel + supercapacitor, daylight only); generator node = open (must monitor the starter battery while the generator is off). Iteration 1 POC runs on USB / power bank.
+- Power variants (shared terms with SNODE): pump node = solar only (panel + supercapacitor, daylight only); generator node = battery only (primary lithium AA, no charging; wakes on USB/AC 5 V change and on a timer that also reads the starter battery). Reuse SNODE designs where they fit: docs/snode-compat.md "Reused from SNODE". Iteration 1 POC runs on USB / power bank.
 - Node IDs follow `unode_<purpose>_<nn>` (e.g. `unode_gen_01`, `unode_pump_01`).
 - Stay compatible with SNODE (https://github.com/realsystem/snode): reserved ESP-NOW packet types 0x10-0x1F / 0x90-0x9F and HA event `esphome.unode_report`. Contract: docs/snode-compat.md (reference copy in the SNODE repo); change both together.
 - Use MQTT, not the ESPHome native API (nodes may sleep; broker LWT gives the offline alert).
@@ -38,7 +39,7 @@
 - GPIO0/2/15 are boot-strapping pins; don't put loads on them that change their boot level.
 - SW-420 output polarity varies by module: check `inverted` on the bench.
 - Windows flashing needs the Silicon Labs CP210x (or CH340) USB driver.
-- Li-ion must not charge below 0 °C: charger needs an NTC on its TS/TH pin; don't remove it.
+- No rechargeable cells in the node designs (gen = primary lithium, pump = supercapacitor). If a Li-ion/LiFePO4 cell is ever added, it must not charge below 0 °C (charger with cold cut-off).
 - Site internet (Starlink) sleeps 9 PM–9 AM; nothing in the design may depend on internet.
 - In Claude cloud sessions pip/package installs are blocked, so `esphome`/`arduino-cli` can't be run there; GitHub GraphQL (`gh pr create`) is blocked, use `gh api repos/realsystem/unode/pulls ...`.
 
