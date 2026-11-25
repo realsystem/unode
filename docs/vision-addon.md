@@ -63,6 +63,74 @@ indicators:
 
 Placeholder coordinates: the RPS profile is filled in from the front-panel photo.
 
+LED column in the manufacturer's front-panel photo (VERIFIED, from the photo): seven lights, top to
+bottom POWER, PUMP, MPPT, ERROR, LOW PWR, TANK FULL, WELL LOW. As fractions of the enclosure's outer
+rectangle (about 423 x 615 px in that photo): column at x = 0.775 of the width from the left edge,
+POWER at y = 0.283 of the height from the top, pitch 0.044 of the height.
+
+## RPS front panel: observed behavior (from RPS videos)
+
+Sources (VERIFIED, manufacturer channel "RPS Solar Pumps"):
+- "Pro Builder Explains: The Best Add-On for Off-Grid Solar Well Pumps",
+  https://www.youtube.com/watch?v=Y8KyG-82_uo, 0:26-1:30 (close-up of the panel).
+- "Tour Jared's Homestead & Livestock Solar-Powered Water Set Up: RPS 800, RPS 200 & 110V Converter",
+  https://www.youtube.com/watch?v=BD27DEwsAQo, 25:00-32:00 (panel on a shed wall, small in frame).
+
+Method: the product photo of the panel was matched to every frame (SIFT features + homography, 30 fps),
+which maps each frame onto the photo so each LED position is known. The close-up clip matched in 63 % of
+frames (the rest: hand in front, camera moves, blur). Frames and the photo are the manufacturer's
+material and are not stored in this repo.
+
+Modes seen (VERIFIED, seen on the frames; the mode names are UNVERIFIED, inferred from the labels):
+
+| Mode | POWER | PUMP | MPPT | TANK FULL | Where |
+|---|---|---|---|---|---|
+| Pumping | green, steady | green, steady | green, **blinking** (about 1.0 s on / 1.2 s off) | off | Y8Ky video, 0:26-0:40 |
+| Tank full | green, steady | off | off | **red**, steady | Y8Ky video, about 0:50 to 1:30 |
+
+Other observations:
+- Lit LEDs are bright with a white core and a colored glow. **Unlit LEDs look amber/yellow** (their lens
+  colour), not dark, so "yellowish" must not count as on. VERIFIED.
+- Glare on the label or enclosure can make non-LED spots look bright. Judge each light by brightness
+  against its neighbors **and** hue, not brightness alone. VERIFIED (it produced false "on" readings).
+- ERROR, LOW PWR and WELL LOW were never seen lit in about 8 minutes of video. Their colors and behavior
+  are unknown. UNVERIFIED: needs the RPS manual or a fault test.
+- Blink timing is from only a few cycles (about 2.2 s per cycle, +/- 0.2 s). UNVERIFIED. Whether PUMP
+  blinks while starting was not seen.
+- Sampling once per second hid the MPPT blink in the tour video (the lit bar seemed to change length).
+  The reader needs at least 4 frames/s over a window of at least 5 s to tell steady from blinking.
+  UNVERIFIED as a requirement; it follows from the cycle above.
+
+Implications for the profile (UNVERIFIED):
+- Raise `blink.max_period_ms` from 2000 to about 3000 (the observed cycle is about 2.2 s).
+- MPPT blinking while pumping is normal, so a blink on MPPT must not raise a fault.
+- Colors: POWER, PUMP, MPPT green; TANK FULL red.
+
+## Camera check: bench notes (2026-11-25)
+
+- VERIFIED: `esphome/unode-vision-camcheck.yaml` compiles, flashes and serves a valid 800x600 JPEG at
+  `:8081` (stream at `:8080`).
+- VERIFIED: right after flashing, the log repeated `Got invalid frame from camera!` and the snapshot
+  failed. Re-seating the camera ribbon (power off, lift the latch, push the ribbon fully in) fixed it.
+  The camera had passed its probe, so a bad probe is not the only sign of a loose ribbon.
+- VERIFIED: flashing the ESP32-CAM with a CP2102 USB-serial adapter (3.3 V logic): adapter TXD to U0R,
+  RXD to U0T, +5V to 5V, GND to GND, IO0 to GND while powering up. DTR is not connected, so there is no
+  auto-reset: power-cycle the camera (pull and replug the 5V wire) to reset it. To run, remove the IO0
+  jumper and power-cycle.
+- VERIFIED: wiring check before flashing. With IO0 grounded at power-up, the boot ROM prints
+  `boot:0x3 (DOWNLOAD_BOOT...) waiting for download` on U0T at 115200. Seeing it proves power, ground,
+  IO0 and the camera-to-adapter wire.
+- VERIFIED failure: an ESP8266 NodeMCU as the adapter (RST to GND, TX to U0R, RX to U0T) gave
+  `No serial data received`. A community post suggests TX to TX and RX to RX for that trick; not tested
+  here. UNVERIFIED.
+- VERIFIED on the Windows dev PC: ESPHome ESP32 builds failed on Python 3.15 (ESP-IDF needs the
+  `windows-curses` package, which has no build for it). Use Python 3.12 in a virtual environment. Set
+  `ESPHOME_ESP_IDF_PREFIX` to a short path such as `C:\ESPHome\idf`, because the default toolchain path
+  is longer than Windows' 260-character limit and gives errors like `bits/c++config.h: No such file`.
+- VERIFIED on the same PC: antivirus HTTPS scanning (Avast Web Shield) re-signs downloads, so Python
+  tools failed with `CERTIFICATE_VERIFY_FAILED` for github.com, githubusercontent.com, platformio.org,
+  espressif.com and pypi.org until those hosts were excluded from HTTPS scanning.
+
 ## Steps
 
 1. **Camera check (bench, USB 5 V):** flash `esphome/unode-vision-camcheck.yaml`, open the
@@ -79,7 +147,10 @@ Placeholder coordinates: the RPS profile is filled in from the front-panel photo
 
 ## Open items
 
-- Controller front-panel photo: which lights exist, steady or blinking, colors.
-- Flashing the ESP32-CAM: needs an ESP32-CAM-MB USB base or a USB-serial adapter (GPIO0 to GND to flash).
+- Controller front-panel behavior: POWER, PUMP, MPPT and TANK FULL are known (see "RPS front panel:
+  observed behavior"). Still open: ERROR, LOW PWR and WELL LOW (colors, steady or blinking), and whether
+  PUMP blinks while starting.
+- Flashing the ESP32-CAM: done with a CP2102 USB-serial adapter (see "Camera check: bench notes"); an
+  ESP32-CAM-MB USB base also works. GPIO0 to GND to flash.
 - Mounting: fixed bracket, no movement between camera and panel; shade from direct sun.
 - Firmware choice for step 3: ESPHome external component vs. standalone Arduino/ESP-IDF sketch.
