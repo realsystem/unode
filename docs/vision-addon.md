@@ -133,6 +133,66 @@ Implications for the profile (UNVERIFIED):
   tools failed with `CERTIFICATE_VERIFY_FAILED` for github.com, githubusercontent.com, platformio.org,
   espressif.com and pypi.org until those hosts were excluded from HTTPS scanning.
 
+## ESP32-CAM on a weak Wi-Fi link: findings (bench, 2026-11-25)
+
+Why: a user's Wi-Fi may be weak and we cannot ask them to move the router or add power. Reading a
+blinking light needs at least 4 frames/s (see "RPS front panel"). With the default
+`unode-vision-camcheck.yaml` the camera streamed at only 0.1-0.5 frames/s (about 9 kB/s), ping to
+it had a median of 115-215 ms with 3-10 % loss, and an over-the-air update took 220 s (VERIFIED, measured).
+
+Method: one setting changed at a time, flashed over the air, then measured the same way: 30 pings
+and two 20 s runs of the MJPEG stream (port 8080). A change was kept only if it was at least 1.3x
+faster. One board, one router, one scene (a phone showing the panel), short runs.
+
+| Change (all vs. the baseline) | Frames/s | Data rate | Ping median / worst | Result |
+|---|---|---|---|---|
+| Baseline: camera clock 20 MHz, power save off | 0.32 | 9 kB/s | 19.5 / 183 ms | |
+| Camera clock 10 MHz | 0.05 | 1.3 kB/s | 84.5 / 620 ms | worse |
+| Camera clock **8 MHz** | **4.6** | 122 kB/s | **8.5 / 59 ms** | kept |
+| Wi-Fi TX power 20 dB (on top of 8 MHz) | 4.57 | 120 kB/s | 7.5 / 15 ms | no change |
+| Wi-Fi TX power 15 dB (on top of 8 MHz) | 4.74 | 123 kB/s | 7.0 / 30 ms | no change |
+| Frames 320x240, JPEG quality 25 (on top of 8 MHz) | **8.6** | 39 kB/s | 10 / 30 ms | kept |
+| Larger Wi-Fi/TCP buffers | not run | | | queue stopped at the 5 frames/s target |
+
+Findings:
+- VERIFIED (this board): lowering the camera clock from 20 to 8 MHz made the stream 14x faster and cut
+  ping latency by more than half with the same router, position and power. The camera's own clock was
+  interfering with its Wi-Fi radio. Several forum reports describe the same (clock noise coupling into the
+  antenna, fixed by a lower clock, shielding or a ground plane).
+- VERIFIED: 10 MHz was worse than 20 MHz. UNVERIFIED explanation: harmonics of the clock landing inside the
+  router's channel. So treat the camera clock as a calibration to check per site and Wi-Fi channel, not as a
+  constant. Not tested: other channels, other routers, other boards.
+- VERIFIED: TX power (15 or 20 dB) made no difference once the interference was removed.
+- UNVERIFIED: `power_save_mode: none` helped. It was set before the measurements and not isolated.
+- VERIFIED: 320x240 doubled the frame rate again (4.6 to 8.6) but each LED is then only a few pixels
+  wide, about 14 px apart, so neighbouring glows overlap. With a fixed brightness threshold a steady LED
+  next to a blinking one read as blinking (its reading moved between about 19 and 27). Decide steady or
+  blinking from how much each LED's reading swings over time (blinking MPPT: about 35, steady POWER: about 8).
+- VERIFIED (method): with the camera on a phone showing the pumping animation (1.0 s on / 1.2 s off), the
+  camera measured 0.99 s on / 1.19 s off, a 2.18 s cycle over 13 cycles at 8.6 frames/s. This checks the
+  camera, the fix and the timing method, not the real controller.
+- VERIFIED: the snapshot page (port 8081) is slow (about one frame per 5 s) because ESPHome's camera runs
+  fast only while a stream is requested. Use the stream (port 8080) for timing. Leaving connections
+  half-open stalled the camera for tens of seconds.
+- Not tested: antenna selection or an external antenna, a separate stronger 5 V supply, larger Wi-Fi/TCP
+  buffers (`sdkconfig_options`), other router channels.
+
+Design consequences (UNVERIFIED):
+- A weak link should not carry video. Read the lights on the camera and send only the result (a few
+  bytes by MQTT or ESP-NOW). ESPHome 2026.11 has an `on_image` trigger on `esp32_camera`, but the camera
+  only captures fast while a stream is requested (idle rate is at most 1 frame/s), so continuous reading at 4+
+  frames/s probably needs a small custom component that requests frames itself.
+- Keep the camera-clock check in the bring-up procedure for each site.
+
+Sources: [Random Nerd Tutorials, external antenna](https://randomnerdtutorials.com/esp32-cam-connect-external-antenna/),
+[Espressif, Wi-Fi Performance and Power Save](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi-driver/wifi-performance-and-power-save.html),
+[ESPHome WiFi component](https://esphome.io/components/wifi/),
+[esp32.com, recommended XCLK values](https://esp32.com/viewtopic.php?p=142317),
+[esp32.com, weird WiFi behaviour](https://esp32.com/viewtopic.php?p=17021),
+[Home Assistant forum, ESP32-CAM stability](https://community.home-assistant.io/t/esp32-cam-stability/281712),
+[esp32-camera issue 172](https://github.com/espressif/esp32-camera/issues/172).
+The experiment driver and analysis scripts are not in this repo.
+
 ## Steps
 
 1. **Camera check (bench, USB 5 V):** flash `esphome/unode-vision-camcheck.yaml`, open the
@@ -154,5 +214,9 @@ Implications for the profile (UNVERIFIED):
   PUMP blinks while starting.
 - Flashing the ESP32-CAM: done with a CP2102 USB-serial adapter (see "Camera check: bench notes"); an
   ESP32-CAM-MB USB base also works. GPIO0 to GND to flash.
+- Camera clock vs Wi-Fi channel: find out whether the best clock depends on the router channel, and
+  whether the firmware should test or select it at boot. Also try an external antenna and a separate 5 V supply.
+- Light-reading on the camera: a custom component that requests frames and reports each light's state
+  (steady/blinking/off) over MQTT or ESP-NOW, so no video has to cross a weak link.
 - Mounting: fixed bracket, no movement between camera and panel; shade from direct sun.
 - Firmware choice for step 3: ESPHome external component vs. standalone Arduino/ESP-IDF sketch.
