@@ -10,6 +10,8 @@ blinking light as the camera sees it.
 | `run_experiments.py` | Hands-off queue: edit a copy of the config, validate, flash over the air, measure, keep a change only if it clearly helps, flash the best settings at the end. |
 | `blink_probe.py` | Finds the lit LEDs in the stream by itself and times each one's on/off periods. Needs `numpy`, `opencv-python-headless`. |
 
+Our raw data and result tables are in `results/` (see `results/README.md`).
+
 Status: the numbers in the docs came from one board, one router and one scene. UNVERIFIED that other
 setups give the same ranking. The scripts were checked on the same bench (dry run of all seven configs,
 live `measure_link.py` 8.59 frames/s, live `blink_probe.py` 2.20 s cycle).

@@ -1,0 +1,12 @@
+{"phase": "A1 tuned (8 MHz, 320x240) as currently running, re-flashed", "round": 1, "fps": 8.59, "kBps": 39.7, "loss_pct": 0.0, "median_ms": 8.0, "max_ms": 21}
+{"phase": "A1 tuned (8 MHz, 320x240) as currently running, re-flashed", "round": 2, "fps": 8.62, "kBps": 40.6, "loss_pct": 0.0, "median_ms": 8.0, "max_ms": 18}
+{"phase": "A1 tuned (8 MHz, 320x240) as currently running, re-flashed", "round": 3, "fps": 8.19, "kBps": 38.7, "loss_pct": 0.0, "median_ms": 7.0, "max_ms": 13}
+{"phase": "A1 tuned (8 MHz, 320x240) as currently running, re-flashed", "summary": true, "fps_mean": 8.47, "fps_min": 8.19, "fps_max": 8.62, "rounds": 3}
+{"phase": "B original (20 MHz, 800x600)", "round": 1, "fps": 1.17, "kBps": 33.0, "loss_pct": 0.0, "median_ms": 15.0, "max_ms": 109}
+{"phase": "B original (20 MHz, 800x600)", "round": 2, "fps": 1.18, "kBps": 30.2, "loss_pct": 0.0, "median_ms": 12.0, "max_ms": 37}
+{"phase": "B original (20 MHz, 800x600)", "summary": true, "fps_mean": 1.17, "fps_min": 1.17, "fps_max": 1.18, "rounds": 2}
+{"phase": "A2 tuned again, re-flashed", "round": 1, "fps": 8.59, "kBps": 41.0, "loss_pct": 0.0, "median_ms": 8.5, "max_ms": 20}
+{"phase": "A2 tuned again, re-flashed", "round": 2, "fps": 8.62, "kBps": 41.3, "loss_pct": 0.0, "median_ms": 7.0, "max_ms": 15}
+{"phase": "A2 tuned again, re-flashed", "round": 3, "fps": 8.04, "kBps": 39.5, "loss_pct": 0.0, "median_ms": 7.0, "max_ms": 31}
+{"phase": "A2 tuned again, re-flashed", "summary": true, "fps_mean": 8.42, "fps_min": 8.04, "fps_max": 8.62, "rounds": 3}
+{"done": true}
