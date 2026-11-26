@@ -191,7 +191,7 @@ Sources: [Random Nerd Tutorials, external antenna](https://randomnerdtutorials.c
 [esp32.com, weird WiFi behaviour](https://esp32.com/viewtopic.php?p=17021),
 [Home Assistant forum, ESP32-CAM stability](https://community.home-assistant.io/t/esp32-cam-stability/281712),
 [esp32-camera issue 172](https://github.com/espressif/esp32-camera/issues/172).
-The experiment driver and analysis scripts are not in this repo.
+To repeat the test, see `tools/cam-link-test/README.md` (experiment driver, link measurement and blink timing scripts).
 
 ## Steps
 
