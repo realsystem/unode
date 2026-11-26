@@ -34,6 +34,9 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  # Bench tool on USB power: keep the radio awake. (Its own effect was not isolated, see
+  # docs/vision-addon.md "ESP32-CAM on a weak Wi-Fi link".)
+  power_save_mode: none
   ap:
     ssid: "UNODE-CAM-Fallback"
     password: !secret fallback_password
@@ -49,15 +52,20 @@ esp32_camera:
   name: "Panel camera"
   external_clock:
     pin: GPIO0
-    frequency: 20MHz
+    # 8 MHz, not the 20 MHz default: the camera clock interfered with this board's Wi-Fi and
+    # slowed the stream to 0.3 frames/s; at 8 MHz it ran at 4.6 (measured). 10 MHz was worse than
+    # 20 MHz, so this may depend on the router channel: re-test on a new site.
+    frequency: 8MHz
   i2c_id: camera_i2c
   data_pins: [GPIO5, GPIO18, GPIO19, GPIO21, GPIO36, GPIO39, GPIO34, GPIO35]
   vsync_pin: GPIO25
   href_pin: GPIO23
   pixel_clock_pin: GPIO22
   power_down_pin: GPIO32
-  resolution: 800x600
-  jpeg_quality: 10
+  # Small frames keep the stream fast on a weak link (8.6 frames/s here; 800x600 gave 4.6).
+  # LEDs are only a few pixels wide at this size; raise it for a closer look at a panel.
+  resolution: 320x240
+  jpeg_quality: 25
 
 esp32_camera_web_server:
   - port: 8080
