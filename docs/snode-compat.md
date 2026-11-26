@@ -49,5 +49,6 @@ Proposed, all UNVERIFIED until bench tests; details live in the SNODE repo.
 | `unode_gen` wake | **G1 (owner decision):** ESP32-C3 deep sleep, GPIO level wake on the 5 V sense (opposite level armed before sleep) + timer. ~1.3 mAh/day with ESP-NOW, ~5 years on 3x L91 (UNVERIFIED; measure board sleep current with SNODE's T2 method). G2 (SNODE RTC power gating) rejected: needs an edge-detect circuit for multi-day runs, no practical life gain | D11, D23 |
 | `unode_pump` storage | Supercapacitor + TI BQ25570 harvester + TPS61099 boost: fits the light-sensor version; the camera version (~0.9 W) is beyond it: open | D28, D23, variant A |
 | Radio | ESP-NOW to the SNODE receiver, channel follow | D27, D30, D31 |
+| ESP-NOW bench results | ESP32 to ESP32 test, 0 % loss over one hour at 1-3 m, cold-start search about 170 s; walk test and router-channel-change test still open | SNODE docs/poc-espnow-bench.md |
 | Receiver | Same receiver firmware gains UNODE packet types 0x10-0x1F (one firmware, not two) | `firmware/receiver/` |
 | Tests | Sleep/off current method (T2), walk-test method (T9/T12) at the pump and generator spots | `05-poc-plan.md` |
