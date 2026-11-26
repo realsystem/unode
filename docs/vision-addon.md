@@ -89,8 +89,10 @@ Modes seen (VERIFIED, seen on the frames; the mode names are UNVERIFIED, inferre
 | Tank full | green, steady | off | off | **red**, steady | Y8Ky video, about 0:50 to 1:30 |
 
 Other observations:
-- Lit LEDs are bright with a white core and a colored glow. **Unlit LEDs look amber/yellow** (their lens
-  colour), not dark, so "yellowish" must not count as on. VERIFIED.
+- Lit LEDs are green or red. In the video the centre of a lit LED looks white because the camera
+  overexposes it; the glow around the centre keeps the LED's colour. There are no white LEDs on the
+  panel (owner). Judge the colour of the glow, not the centre. **Unlit LEDs look amber/yellow** (their
+  lens colour), not dark, so "yellowish" must not count as on. VERIFIED (seen on the frames).
 - Glare on the label or enclosure can make non-LED spots look bright. Judge each light by brightness
   against its neighbors **and** hue, not brightness alone. VERIFIED (it produced false "on" readings).
 - ERROR, LOW PWR and WELL LOW were never seen lit in about 8 minutes of video. Their colors and behavior
