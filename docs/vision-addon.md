@@ -177,6 +177,20 @@ Findings:
 - Not tested: antenna selection or an external antenna, a separate stronger 5 V supply, larger Wi-Fi/TCP
   buffers (`sdkconfig_options`), other router channels.
 
+Repeat test (same board, router and scene; tuned build vs original, each freshly flashed over the air):
+- VERIFIED: tuned build (8 MHz clock, 320x240) A1 8.19-8.62 frames/s (mean 8.47), original build (20 MHz,
+  800x600) 1.17-1.18, tuned build again A2 8.04-8.62 (mean 8.42). Ping median 7-8.5 ms and worst case 31 ms or
+  less for the tuned build, 12-15 ms and up to 109 ms for the original. 0 % ping loss in all of these rounds.
+  The tuned build stayed fast after both reboots.
+- VERIFIED: the original build is not only slow but unpredictable: 0.05-0.5 frames/s in the first tests,
+  0.32 in the queue, 1.17 here, always below the 4 frames/s a blink needs. The gap to the tuned build ranged
+  from about 7x to 27x depending on the moment.
+- VERIFIED: five timings of the phone animation's blink (1.00 s on / 1.20 s off): 0.94-1.03 s on, 1.17-1.21 s
+  off, cycle 2.15-2.21 s, 10-13 complete cycles each. In four of the five runs POWER and PUMP read steady; in
+  the first, POWER showed spurious transitions from neighbouring glow (see above).
+- Raw data and tables: `tools/cam-link-test/results/`. Still one board, one router, one channel, about 25
+  minutes of repeats: UNVERIFIED for other sites.
+
 Design consequences (UNVERIFIED):
 - A weak link should not carry video. Read the lights on the camera and send only the result (a few
   bytes by MQTT or ESP-NOW). ESPHome 2026.11 has an `on_image` trigger on `esp32_camera`, but the camera
@@ -191,7 +205,7 @@ Sources: [Random Nerd Tutorials, external antenna](https://randomnerdtutorials.c
 [esp32.com, weird WiFi behaviour](https://esp32.com/viewtopic.php?p=17021),
 [Home Assistant forum, ESP32-CAM stability](https://community.home-assistant.io/t/esp32-cam-stability/281712),
 [esp32-camera issue 172](https://github.com/espressif/esp32-camera/issues/172).
-The experiment driver and analysis scripts are not in this repo.
+To repeat the test, see `tools/cam-link-test/README.md` (experiment driver, link measurement and blink timing scripts).
 
 ## Steps
 
