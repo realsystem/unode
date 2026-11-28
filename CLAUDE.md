@@ -25,7 +25,7 @@
 - Power variants (shared terms with SNODE): pump node = solar only (panel + supercapacitor, daylight only); generator node = battery only (primary lithium AA, no charging; wakes on USB/AC 5 V change and on a timer that also reads the starter battery). Reuse SNODE designs where they fit: docs/snode-compat.md "Reused from SNODE". Iteration 1 POC runs on USB / power bank.
 - Node IDs follow `unode_<purpose>_<nn>` (e.g. `unode_gen_01`, `unode_pump_01`).
 - Stay compatible with SNODE (https://github.com/realsystem/snode): reserved ESP-NOW packet types 0x10-0x1F / 0x90-0x9F and HA event `esphome.unode_report`. Contract: docs/snode-compat.md (reference copy in the SNODE repo); change both together.
-- Use MQTT, not the ESPHome native API (nodes may sleep; broker LWT gives the offline alert).
+- Use MQTT, not the ESPHome native API (nodes may sleep; broker LWT gives the offline alert). Exception: the camper node (docs/camper-solar.md) is standalone, always on, powered from the camper 12 V, and serves its own phone interface; MQTT to HA is optional there.
 - Keep HA-facing entity names stable (automations depend on them): "Generator running", "Generator run hours", "Node status".
 - Persisted counters: `globals` with `restore_value` + `preferences: flash_write_interval: 10min` (flash wear).
 - Tunables go in `substitutions` (e.g. `run_threshold`), set from field data.
