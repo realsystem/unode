@@ -1,0 +1,274 @@
+# UNODE camper node POC: Renogy Rover 40 monitor over its BT-1 Bluetooth module (design: docs/camper-solar.md)
+# Hardware: ESP32-CAM (AI-Thinker), camera unused. USB 5 V for the bench; later camper 12 V -> fuse -> 5 V buck.
+# Standalone: no HA, no Pi. Phone browser opens http://unode-camper-01.local (or the hotspot address).
+# Status: UNVERIFIED until the bench test against the real Rover (see "Steps" in the design doc).
+#
+# Secrets used (add to esphome/secrets.yaml, never commit): wifi_ssid, wifi_password, ap_password, ota_password,
+# web_user, web_password, rover_mac (Bluetooth address of the BT-1; see "Finding the BT-1" below).
+#
+# Finding the BT-1: power the Rover, flash with rover_mac set to 00:00:00:00:00:01, watch the log. A line
+# "Renogy BT module: <address>" shows its address; put it in secrets.yaml as rover_mac and reflash.
+# (The BT-1 name usually starts with "BT-"; UNVERIFIED for this unit.)
+# Flashing the ESP32-CAM over USB: IO0 to GND at power-up (see docs/vision-addon.md). Later updates go over Wi-Fi.
+
+substitutions:
+  name: unode-camper-01
+  friendly_name: UNODE Camper
+  poll_s: "10"          # seconds between Rover reads (the community project uses 30)
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  includes:
+    - unode_camper_rover.h
+
+esp32:
+  board: esp32cam
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  # Order = preference. Add the camper's Starlink network here as a second entry.
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+  # Hotspot: ESPHome starts it only when no network above can be joined (UNVERIFIED for this build).
+  ap:
+    ssid: "UNODE-Camper"
+    password: !secret ap_password
+
+web_server:
+  port: 80
+  local: true            # page files from the node itself: works with no internet
+  auth:
+    type: digest
+    username: !secret web_user
+    password: !secret web_password
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true         # defaults keep Bluetooth and Wi-Fi sharing the radio
+  on_ble_advertise:
+    - then:
+        - lambda: |-
+            static uint32_t last = 0;
+            if (millis() - last > 5000 && strncmp(x.get_name().c_str(), "BT-", 3) == 0) {
+              last = millis();
+              ESP_LOGI("scan", "Renogy BT module: %s  name '%s'  rssi %d", x.address_str().c_str(),
+                       x.get_name().c_str(), x.get_rssi());
+            }
+
+ble_client:
+  - mac_address: !secret rover_mac
+    id: rover
+    auto_connect: true
+    on_connect:
+      then:
+        - logger.log: "BLE connected to the Rover module"
+    on_disconnect:
+      then:
+        - logger.log: "BLE disconnected from the Rover module"
+
+globals:
+  - id: last_ok_ms          # millis() of the last good answer
+    type: uint32_t
+    initial_value: "0"
+  - id: have_data
+    type: bool
+    initial_value: "false"
+
+output:
+  - platform: gpio
+    id: led
+    pin:
+      number: GPIO33     # ESP32-CAM red status LED, on when low
+      inverted: true
+
+script:
+  - id: blink
+    mode: restart
+    then:
+      - output.turn_on: led
+      - delay: 150ms
+      - output.turn_off: led
+
+  - id: publish_rover
+    then:
+      - lambda: |-
+          id(soc).publish_state(camper::u16(3));
+          id(batt_v).publish_state(camper::u16(5) * 0.1f);
+          id(batt_a).publish_state(camper::u16(7) * 0.01f);
+          id(ctrl_t).publish_state(camper::temp_c(camper::frame[9]));
+          id(batt_t).publish_state(camper::temp_c(camper::frame[10]));
+          id(load_v).publish_state(camper::u16(11) * 0.1f);
+          id(load_a).publish_state(camper::u16(13) * 0.01f);
+          id(load_w).publish_state(camper::u16(15));
+          id(pv_v).publish_state(camper::u16(17) * 0.1f);
+          id(pv_a).publish_state(camper::u16(19) * 0.01f);
+          id(pv_w).publish_state(camper::u16(21));
+          id(gen_today).publish_state(camper::u16(41));
+          id(cons_today).publish_state(camper::u16(43));
+          id(ah_in_today).publish_state(camper::u16(37));
+          id(gen_total).publish_state(camper::u32(59) * 0.001f);
+          id(charge_state).publish_state(camper::charge_state(camper::frame[68]));
+          id(load_on).publish_state((camper::frame[67] & 0x80) != 0);
+          id(last_ok_ms) = millis();
+          id(have_data) = true;
+      - script.execute: blink
+
+interval:
+  - interval: ${poll_s}s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(rover)->connected();'
+          then:
+            - lambda: 'camper::start_request(millis());'
+            - ble_client.ble_write:
+                id: rover
+                service_uuid: FFD0
+                characteristic_uuid: FFD1
+                value: !lambda 'return camper::request();'
+
+sensor:
+  # Receives the Rover's answer (notifications), joins the pieces and publishes the values below.
+  - platform: ble_client
+    ble_client_id: rover
+    id: rover_rx
+    internal: true
+    type: characteristic
+    service_uuid: FFF0
+    characteristic_uuid: FFF1
+    notify: true
+    update_interval: never
+    lambda: |-
+      int r = camper::feed(x);
+      if (r == 1) {
+        id(publish_rover).execute();
+      } else if (r == -1) {
+        ESP_LOGW("rover", "answer dropped: bad CRC (%u so far)", (unsigned) camper::bad_frames);
+      }
+      return NAN;
+
+  - platform: template
+    id: soc
+    name: "Camper battery percentage"
+    device_class: battery
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+  - platform: template
+    id: batt_v
+    name: "Camper battery voltage"
+    device_class: voltage
+    unit_of_measurement: "V"
+    accuracy_decimals: 1
+  - platform: template
+    id: batt_a
+    name: "Camper charge current"
+    device_class: current
+    unit_of_measurement: "A"
+    accuracy_decimals: 2
+  - platform: template
+    id: batt_t
+    name: "Camper battery temperature"
+    device_class: temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+  - platform: template
+    id: ctrl_t
+    name: "Camper controller temperature"
+    device_class: temperature
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+  - platform: template
+    id: pv_v
+    name: "Camper PV voltage"
+    device_class: voltage
+    unit_of_measurement: "V"
+    accuracy_decimals: 1
+  - platform: template
+    id: pv_a
+    name: "Camper PV current"
+    device_class: current
+    unit_of_measurement: "A"
+    accuracy_decimals: 2
+  - platform: template
+    id: pv_w
+    name: "Camper PV power"
+    device_class: power
+    unit_of_measurement: "W"
+    accuracy_decimals: 0
+  - platform: template
+    id: load_v
+    name: "Camper load voltage"
+    device_class: voltage
+    unit_of_measurement: "V"
+    accuracy_decimals: 1
+  - platform: template
+    id: load_a
+    name: "Camper load current"
+    device_class: current
+    unit_of_measurement: "A"
+    accuracy_decimals: 2
+  - platform: template
+    id: load_w
+    name: "Camper load power"
+    device_class: power
+    unit_of_measurement: "W"
+    accuracy_decimals: 0
+  - platform: template
+    id: gen_today
+    name: "Camper generation today"
+    device_class: energy
+    unit_of_measurement: "Wh"
+    accuracy_decimals: 0
+  - platform: template
+    id: cons_today
+    name: "Camper consumption today"
+    device_class: energy
+    unit_of_measurement: "Wh"
+    accuracy_decimals: 0
+  - platform: template
+    id: ah_in_today
+    name: "Camper charge Ah today"
+    unit_of_measurement: "Ah"
+    accuracy_decimals: 0
+  - platform: template
+    id: gen_total
+    name: "Camper generation total"
+    device_class: energy
+    unit_of_measurement: "kWh"
+    accuracy_decimals: 1
+  - platform: wifi_signal
+    name: "WiFi signal"
+    update_interval: 60s
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
+text_sensor:
+  - platform: template
+    id: charge_state
+    name: "Camper charging state"
+
+binary_sensor:
+  - platform: template
+    id: load_on
+    name: "Camper load output"
+  # ON while good answers keep arriving (within 3 poll intervals).
+  - platform: template
+    name: "Rover link"
+    device_class: connectivity
+    lambda: |-
+      return id(have_data) && (millis() - id(last_ok_ms)) < 3UL * ${poll_s} * 1000UL;
+
+button:
+  - platform: restart
+    name: "Restart"

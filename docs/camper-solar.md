@@ -5,7 +5,19 @@ module, and shows the data on the owner's phone **without a Raspberry Pi and wit
 Later the same node takes other vehicle sensors (see "Later add-ons").
 
 Claims are marked VERIFIED (owner, vendor or cited source) or UNVERIFIED (needs a test).
-Status: design only, decided 2026-11-28. No firmware written yet.
+Status: design decided 2026-11-28. Bench firmware `esphome/unode-camper-poc.yaml` (+ `unode_camper_rover.h`) written.
+The board is an ESP32-CAM (camera unused); the owner chose it over ESP8266 + CC2541 (see "Why ESP32").
+Bench so far (2026-11-28, VERIFIED): the config compiles with ESPHome 2026.11.0 (ESP-IDF, 66 % of flash), the CRC routine
+reproduces the known request bytes `FF 03 01 00 00 22 D1 F1`, the flashed node boots, joins Wi-Fi and serves its web page and
+event stream with all entities. **Not yet done:** reading the real Rover (BT-1 not yet powered/near), comparison with the
+Renogy app, Wi-Fi + Bluetooth stability, hotspot.
+
+## Why ESP32 (not ESP8266 + a BLE module)
+
+BC417 is classic Bluetooth, not BLE, so it cannot talk to the BT-1. A CC2541 (HM-10 type) can be a BLE central, but its
+stock firmware talks to one serial characteristic, while the BT-1 needs writes to `FFD1` and notifications from `FFF1`:
+UNVERIFIED that any module firmware does that. One ESP32 does BLE and Wi-Fi in a single chip, matches the later
+ESP32-C3 move, and needs no UART bridge. Decided by the owner 2026-11-28.
 
 ## Owner decisions (VERIFIED, from the owner)
 
